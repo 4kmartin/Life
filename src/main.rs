@@ -1,34 +1,52 @@
 use std::{thread, time};
+use clap::Parser;
+
+///Conway's Game of Life implemented in Rust! 🎺🎺🎺
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+    ///a hexadecimal string where every two digits represent the coords of a living cell.
+    ///for example, ff would mean that the cell at column 15, row 15 is alive
+    #[clap(default_value = "030c131c232c434c535c636c838c939ca3acc3ccd3dce3ec")]
+    seed: String,
+
+    ///specify how many frames per second
+    #[clap(short,long,default_value_t=1)]
+    framerate:u8,
+
+    ///specify the number of generations to simulate
+    #[clap(short,long,default_value_t = 10)]
+    generations: u8
+}
 
 
 fn main() {
+    let args = Args::parse();
+    let pause = 1000 / args.framerate as u16;
     let mut world = Game::new();
-    world.set_cell_state(3, 3, State::Alive);
-    world.set_cell_state(4, 3, State::Alive);
-    world.set_cell_state(5, 3, State::Alive);
-    world.set_cell_state(3, 6, State::Alive);
-    world.set_cell_state(4, 6, State::Alive);
-    world.set_cell_state(5, 6, State::Alive);
-    world.set_cell_state(7, 8, State::Alive);
-    world.set_cell_state(8, 8, State::Alive);
-    world.set_cell_state(9, 8, State::Alive);
-    world.set_cell_state(7, 11, State::Alive);
-    world.set_cell_state(8, 11, State::Alive);
-    world.set_cell_state(9, 11, State::Alive);
-    for _ in 0..200{
+    world.initialize(args.seed);    
+    for _ in 0..args.generations{
         print!("\x1B[2J\x1B[1;1H");
         println!("{}",world.draw());
         world.generation();
-        thread::sleep(time::Duration::from_millis(500));
+        thread::sleep(time::Duration::from_millis(pause as u64));
     }
 }
 
+///this enum allows a cell to know its state (ie. dead or alive)
 #[derive(Clone, Copy, Debug)]
 enum State{
     Dead,
     Alive
 }
 
+///a Cell is a single point that can be dead or alive.
+/// 
+/// the rules to determine if a living cell dies is if
+/// 1. the cell has more than three live neighbors, or 
+/// 2. the cell has less than two living neighbors
+/// 
+/// a dead cell can come to life if it has three living neighbors
 #[derive(Clone, Copy)]
 struct Cell {
     state:State,
@@ -65,9 +83,9 @@ impl Game {
 
     fn new() -> Game {
         let mut cells = Vec::new();
-        for _ in 1..16{
+        for _ in 0..16{
             let mut construction :Vec<Cell> = Vec::new();
-            for _ in 1..16{
+            for _ in 0..16{
                 let mut x = Vec::from([Cell::new()]);
                 construction.append(&mut x);
             }
@@ -76,7 +94,7 @@ impl Game {
         Game{cells}
     }
 
-    fn from(width:u8, height:u8) -> Game{
+    /* fn from(width:u8, height:u8) -> Game{
         let mut cells = Vec::new();
         for _ in 1..height{
             let mut construction :Vec<Cell> = Vec::new();
@@ -87,6 +105,21 @@ impl Game {
             cells.append(&mut Vec::from([construction]));
         }
         Game{cells}
+    }*/
+
+    fn initialize(&mut self,seed:String){
+        let mut coord:Vec<usize> = Vec::new();
+        let a: String = seed.chars()
+            .map(|i| "0".to_string() + i.to_string().as_str())
+            .collect();
+        let slice =  hex::decode(a).expect("Not Hexadecimal");
+        for i in slice{
+            coord.append(&mut vec!(i as usize));
+            if coord.len() == 2{
+                self.set_cell_state(coord[0], coord[1], State::Alive);
+                coord = Vec::new();
+            }
+        }
     }
 
     fn draw(&self) -> String{
